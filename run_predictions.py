@@ -32,14 +32,12 @@ def predict_boxes(heatmap, template_height, template_width, stride=1, threshold=
     confidence scores.
     '''
 
-    output = []
-    
-    for i in range(heatmap.shape[0]):
-        for j in range(heatmap.shape[1]):
-            if heatmap[i, j] >= threshold and \
-               heatmap[i, j] == heatmap[max(0, i-1):min(heatmap.shape[0], i+2), max(0, j-1):min(heatmap.shape[1], j+2)].max():
-
-                output.append([i*stride, j*stride, i*stride+template_height, j*stride+template_width, heatmap[i, j]])
+    output = [
+        [i*stride, j*stride, i*stride+template_height, j*stride+template_width, heatmap[i, j]]
+        for j in range(heatmap.shape[1])
+        for i in range(heatmap.shape[0])
+        if heatmap[i, j] == heatmap[max(0, i-1):min(heatmap.shape[0], i+2), max(0, j-1):min(heatmap.shape[1], j+2)].max()
+    ]
 
     return output
 
@@ -64,40 +62,24 @@ def detect_red_light_mf(I):
     BEGIN YOUR CODE
     '''
 
-    # Add three examples of traffic lights of different sizes
+    # Add examples of traffic lights of different sizes
     T = []
-    T.append(np.asarray(Image.open(os.path.join(data_path, 'RL-003.jpg')), dtype=float)[199:207, 281:289, :].astype(float))
-    T.append(np.asarray(Image.open(os.path.join(data_path, 'RL-001.jpg')), dtype=float)[181:193, 68:80, :].astype(float))
-    T.append(np.asarray(Image.open(os.path.join(data_path, 'RL-011.jpg')), dtype=float)[72:90, 355:373, :].astype(float))
-    T.append(np.asarray(Image.open(os.path.join(data_path, 'RL-006.jpg')), dtype=float)[0:20, 381:401, :].astype(float))
-    T.append(np.asarray(Image.open(os.path.join(data_path, 'RL-010.jpg')), dtype=float)[17:39, 137:159, :].astype(float))
+    # T.append(np.asarray(Image.open(os.path.join(data_path, 'RL-003.jpg')))[199:207, 281:289, :])
+    # T.append(np.asarray(Image.open(os.path.join(data_path, 'RL-120.jpg')))[233:245, 142:154, :])
+    T.append(np.asarray(Image.open(os.path.join(data_path, 'RL-011.jpg')))[72:90, 355:373, :])
+    # T.append(np.asarray(Image.open(os.path.join(data_path, 'RL-010.jpg')))[17:39, 137:159, :])
+
+    os.makedirs('data/hw02_templates', exist_ok=True)
+    for i, t in enumerate(T):
+        Image.fromarray(t.astype('|u1')).save(f'data/hw02_templates/t{t.shape[0]}.jpg')
+        T[i] = T[i].astype(float)
 
     # Run matched filtering on all templates
     output = []
-    for i in range(len(T)):
-        heatmap = compute_convolution(I.astype(float), T[i] / np.sqrt((T[i] ** 2).sum()))
-        output.extend(predict_boxes(heatmap, T[i].shape[0], T[i].shape[1]))
-
-    # Merge boxes
-    done = False
-    while not done:
-        done = True
-        for i in range(len(output) - 1):
-            for j in range(i + 1, len(output)):
-                # Check if bounding boxes overlap
-                if ((output[j][0] <= output[i][0] and output[i][0] <= output[j][2]) or (output[i][0] <= output[j][0] and output[j][0] <= output[i][2])) and \
-                   ((output[j][1] <= output[i][1] and output[i][1] <= output[j][3]) or (output[i][1] <= output[j][1] and output[j][1] <= output[i][3])):
-
-                    # Keep box with higher score and start over.
-                    if output[i][4] >= output[j][4]:
-                        del output[j]
-                    else:
-                        del output[i]
-
-                    done = False
-                    break
-            if not done:
-                break
+    for t in T:
+        heatmap = compute_convolution(I.astype(float), t / np.sqrt((t ** 2).sum()))
+        Image.fromarray((heatmap * 255).astype('|u1')).save('data/heatmap.jpg')
+        output.extend(predict_boxes(heatmap, t.shape[0], t.shape[1]))
 
     '''
     END YOUR CODE
@@ -105,7 +87,7 @@ def detect_red_light_mf(I):
 
     for i in range(len(output)):
         assert len(output[i]) == 5
-        assert (output[i][4] >= 0.0 - 1e-6) and (output[i][4] <= 1.0 + 1e-6)
+        assert (output[i][4] >= 0.0) and (output[i][4] <= 1.0 + 1e-6)
         
 
     return output
@@ -124,16 +106,16 @@ preds_path = 'data/hw02_preds'
 os.makedirs(preds_path, exist_ok=True) # create directory if needed
 
 # Set this parameter to True when you're done with algorithm development:
-done_tweaking = False
+done_tweaking = True
 
 '''
 Make predictions on the training set.
 '''
-preds_train = {}
-for i in np.random.choice(len(file_names_train), size=5, replace=False): # range(len(file_names_train)):
-    print(file_names_train[i])
+preds_train = {}    
+for i in range(100): #np.random.choice(len(file_names_train), size=5, replace=False): # range(len(file_names_train)):
+    print(f'{i}/100')
     # read image using PIL:
-    I = Image.open(os.path.join(data_path,file_names_train[i]))
+    I = Image.open(os.path.join(data_path, file_names_train[i]))
 
     # convert to numpy array:
     I = np.asarray(I)
@@ -146,11 +128,11 @@ with open(os.path.join(preds_path, 'preds_train.json'), 'w') as f:
 
 if done_tweaking:
     '''
-    Make predictions on the test set. 
+    Make predictions on the test set.
     '''
     preds_test = {}
     for i in range(len(file_names_test)):
-
+        print(f'{i}/{len(file_names_test)}')
         # read image using PIL:
         I = Image.open(os.path.join(data_path,file_names_test[i]))
 
@@ -160,5 +142,5 @@ if done_tweaking:
         preds_test[file_names_test[i]] = detect_red_light_mf(I)
 
     # save preds (overwrites any previous predictions!)
-    with open(os.path.join(preds_path,'preds_test.json'),'w') as f:
+    with open(os.path.join(preds_path,'preds_test.json'), 'w') as f:
         json.dump(preds_test,f)

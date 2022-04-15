@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import json
 
 np.random.seed(2020) # to ensure you always get the same train/test split
 
@@ -10,7 +11,7 @@ split_path = 'data/hw02_splits'
 os.makedirs(gts_path, exist_ok=True) # create directory if needed
 os.makedirs(split_path, exist_ok=True)
 
-split_test = False # set to True and run when annotations are available
+split_test = True # set to True and run when annotations are available
 
 train_frac = 0.85
 
@@ -45,6 +46,12 @@ if split_test:
     '''
     Your code below. 
     '''
+
+    for name in file_names:
+        if name in file_names_train:
+            gts_train[name] = gts[name]
+        else:
+            gts_test[name] = gts[name]
     
     with open(os.path.join(gts_path, 'annotations_train.json'),'w') as f:
         json.dump(gts_train,f)
